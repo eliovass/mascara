@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Circuito ESP32</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #f0f0f0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            color: white;
+        }
+        #onButton { background-color: #4CAF50; }
+        #offButton { background-color: #f44336; }
+        #status { font-size: 18px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Control de Circuito ESP32</h1>
+    <button id="onButton" onclick="setCircuitState('ON')">Encender Circuito</button>
+    <button id="offButton" onclick="setCircuitState('OFF')">Apagar Circuito</button>
+    <p id="status">Estado del Circuito: Desconocido</p>
+
+    <script>
+        const API_KEY = "AIzaSyAII4zKzpv8FiRu4mtO0SPCbdf2bTzQmi4";
+        const DATABASE_URL = "https://esp32firebasetest-8cf49-default-rtdb.firebaseio.com";
+        const USER_EMAIL = "ryzzvass999@gmail.com";
+        const USER_PASSWORD = "idiedforyou";
+        let idToken = "";
+
+        async function getFirebaseToken() {
+            try {
+                const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: USER_EMAIL,
+                        password: USER_PASSWORD,
+                        returnSecureToken: true
+                    })
+                });
+                const data = await response.json();
+                if (data.idToken) {
+                    idToken = data.idToken;
+                    console.log("Token obtenido");
+                    updateCircuitStatus();
+                } else {
+                    document.getElementById('status').innerText = `Error: ${data.error.message}`;
+                }
+            } catch (error) {
+                console.error('Error de autenticación:', error);
+                document.getElementById('status').innerText = `Error: ${error.message}`;
+            }
+        }
+
+        async function updateCircuitStatus() {
+            try {
+                const response = await fetch(`${DATABASE_URL}/circuitState.json?auth=${idToken}`);
+                const state = await response.json();
+                document.getElementById('status').innerText = `Estado del Circuito: ${state === 'ON' ? 'Encendido (Servos activos)' : state === 'OFF' ? 'Apagado (Servos en 90°)' : 'Desconocido'}`;
+            } catch (error) {
+                console.error('Error al leer estado:', error);
+            }
+        }
+
+        async function setCircuitState(state) {
+            try {
+                const response = await fetch(`${DATABASE_URL}/circuitState.json?auth=${idToken}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(state)
+                });
+                if (response.ok) {
+                    console.log(`Circuito establecido a ${state}`);
+                    updateCircuitStatus();
+                } else {
+                    console.error('Error al establecer estado');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('status').innerText = `Error: ${error.message}`;
+            }
+        }
+
+        getFirebaseToken();
+        setInterval(updateCircuitStatus, 500);
+    </script>
+</body>
+</html>
